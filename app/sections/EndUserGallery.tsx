@@ -51,6 +51,7 @@ export default function EndUserGallery({ album, onBack, activeAgentId, setActive
       name: photo.name,
       confidence: Math.max(72, 99 - index * 3 - Math.floor(Math.random() * 4)),
       color: photo.color,
+      previewUrl: photo.previewUrl,
     })).sort((a, b) => b.confidence - a.confidence)
   }, [album])
 
@@ -323,23 +324,31 @@ export default function EndUserGallery({ album, onBack, activeAgentId, setActive
                       <div
                         key={photo.id}
                         className={cn(
-                          'relative aspect-square bg-gradient-to-br flex items-center justify-center cursor-pointer group transition-all',
+                          'relative aspect-square bg-gradient-to-br flex items-center justify-center cursor-pointer group transition-all overflow-hidden',
                           photo.color,
                           selectedPhotos.has(photo.id) && 'ring-2 ring-primary ring-offset-1'
                         )}
                         onClick={() => togglePhoto(photo.id)}
                       >
-                        <FiCamera className="w-6 h-6 text-muted-foreground/20" />
-                        <Badge className="absolute top-2 right-2 rounded-none text-[9px] tracking-wider bg-white/90 text-foreground border-0">
+                        {photo.previewUrl ? (
+                          <img
+                            src={photo.previewUrl}
+                            alt={photo.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <FiCamera className="w-6 h-6 text-muted-foreground/20" />
+                        )}
+                        <Badge className="absolute top-2 right-2 rounded-none text-[9px] tracking-wider bg-white/90 text-foreground border-0 z-10">
                           {photo.confidence}%
                         </Badge>
                         <div className={cn(
-                          'absolute top-2 left-2 w-5 h-5 border flex items-center justify-center bg-white/80 transition-opacity',
+                          'absolute top-2 left-2 w-5 h-5 border flex items-center justify-center bg-white/80 transition-opacity z-10',
                           selectedPhotos.has(photo.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                         )}>
                           {selectedPhotos.has(photo.id) && <div className="w-3 h-3 bg-primary" />}
                         </div>
-                        <p className="absolute bottom-1.5 left-2 right-2 text-[9px] text-muted-foreground/60 tracking-wider truncate">
+                        <p className="absolute bottom-1.5 left-2 right-2 text-[9px] text-white/80 tracking-wider truncate z-10 drop-shadow-sm">
                           {photo.name}
                         </p>
                       </div>

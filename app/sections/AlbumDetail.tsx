@@ -103,13 +103,14 @@ export default function AlbumDetail({ album, onBack, onUpdateAlbum, onShareAlbum
         progress = 100
         clearInterval(interval)
 
-        // Create photo entries for uploaded files
+        // Create photo entries for uploaded files with real preview URLs
         const newPhotos: PhotoData[] = imageFiles.map((file, index) => ({
           id: nextPhotoId + index,
           name: file.name,
           color: PHOTO_COLORS[(nextPhotoId + index) % PHOTO_COLORS.length],
           size: `${(file.size / 1024).toFixed(0)} KB`,
           uploadedAt: new Date().toISOString(),
+          previewUrl: URL.createObjectURL(file),
         }))
 
         setNextPhotoId(prev => prev + imageFiles.length)
@@ -320,26 +321,34 @@ export default function AlbumDetail({ album, onBack, onUpdateAlbum, onShareAlbum
                       <div
                         key={photo.id}
                         className={cn(
-                          'relative aspect-square bg-gradient-to-br flex flex-col items-center justify-center cursor-pointer group transition-all',
+                          'relative aspect-square bg-gradient-to-br flex flex-col items-center justify-center cursor-pointer group transition-all overflow-hidden',
                           photo.color,
                           selectedPhotos.has(photo.id) && 'ring-2 ring-primary ring-offset-1'
                         )}
                         onClick={() => togglePhoto(photo.id)}
                       >
-                        <FiCamera className="w-5 h-5 text-muted-foreground/20" />
+                        {photo.previewUrl ? (
+                          <img
+                            src={photo.previewUrl}
+                            alt={photo.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <FiCamera className="w-5 h-5 text-muted-foreground/20" />
+                        )}
                         <div className={cn(
-                          'absolute top-1.5 left-1.5 w-5 h-5 border flex items-center justify-center bg-white/80 transition-opacity',
+                          'absolute top-1.5 left-1.5 w-5 h-5 border flex items-center justify-center bg-white/80 transition-opacity z-10',
                           selectedPhotos.has(photo.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                         )}>
                           {selectedPhotos.has(photo.id) && (
                             <div className="w-3 h-3 bg-primary" />
                           )}
                         </div>
-                        <p className="absolute bottom-1 left-1.5 right-1.5 text-[8px] text-muted-foreground/50 tracking-wider truncate">
+                        <p className="absolute bottom-1 left-1.5 right-1.5 text-[8px] text-white/80 tracking-wider truncate z-10 drop-shadow-sm">
                           {photo.name}
                         </p>
                         {photo.size && (
-                          <span className="absolute top-1.5 right-1.5 text-[7px] text-muted-foreground/40 tracking-wider">
+                          <span className="absolute top-1.5 right-1.5 text-[7px] text-white/70 tracking-wider z-10 drop-shadow-sm">
                             {photo.size}
                           </span>
                         )}

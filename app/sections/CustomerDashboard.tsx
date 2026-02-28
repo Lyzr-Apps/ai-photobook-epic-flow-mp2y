@@ -158,10 +158,22 @@ export default function CustomerDashboard({
                   className="rounded-none border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
                   onClick={() => onOpenAlbum(album.id)}
                 >
-                  <div className={cn('h-40 bg-gradient-to-br flex items-center justify-center relative', album.color)}>
-                    <FiCamera className="w-8 h-8 text-muted-foreground/30" />
+                  <div className={cn('h-40 bg-gradient-to-br flex items-center justify-center relative overflow-hidden', album.color)}>
+                    {(() => {
+                      const coverPhoto = album.photos.find(p => p.previewUrl)
+                      if (coverPhoto && coverPhoto.previewUrl) {
+                        return (
+                          <img
+                            src={coverPhoto.previewUrl}
+                            alt={album.title}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        )
+                      }
+                      return <FiCamera className="w-8 h-8 text-muted-foreground/30" />
+                    })()}
                     {album.photos.length > 0 && (
-                      <span className="absolute bottom-2 right-2 text-[10px] tracking-wider bg-white/70 px-2 py-0.5">
+                      <span className="absolute bottom-2 right-2 text-[10px] tracking-wider bg-white/70 px-2 py-0.5 z-10">
                         {album.photos.length} photos
                       </span>
                     )}

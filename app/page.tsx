@@ -64,6 +64,7 @@ export interface PhotoData {
   color: string
   size?: string
   uploadedAt?: string
+  previewUrl?: string
 }
 
 // --- Agent Info ---
