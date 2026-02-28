@@ -1,0 +1,56 @@
+{
+  "workflow": {
+    "nodes": [
+      {"id": "input_node", "type": "Input", "label": "User Query", "nodeCategory": "input"},
+      {"id": "album_intelligence_agent", "type": "Agent", "label": "Album Intelligence Agent", "nodeCategory": "agent"},
+      {"id": "photo_discovery_agent", "type": "Agent", "label": "Photo Discovery Agent", "nodeCategory": "agent"},
+      {"id": "admin_insights_agent", "type": "Agent", "label": "Admin Insights Agent", "nodeCategory": "agent"}
+    ],
+    "edges": [
+      {"source": "input_node", "target": "album_intelligence_agent"},
+      {"source": "input_node", "target": "photo_discovery_agent"},
+      {"source": "input_node", "target": "admin_insights_agent"}
+    ]
+  },
+  "agents": {
+    "album_intelligence_agent": {
+      "agent_id": "69a27fcf8e6d0e51fd5cd3fb",
+      "name": "Album Intelligence Agent",
+      "description": "Assists photographers with generating album descriptions, summarizing engagement analytics (views, downloads, shares), and suggesting auto-tags for uploaded photos based on event context",
+      "provider_id": "openai",
+      "model": "gpt-4.1",
+      "temperature": 0.5,
+      "top_p": 0.95,
+      "image_output_config": null,
+      "voice_config": null,
+      "file_output": false,
+      "response_schema_file": "response_schemas/album_intelligence_agent_response.json"
+    },
+    "photo_discovery_agent": {
+      "agent_id": "69a27fcf00b22915dd81e164",
+      "name": "Photo Discovery Agent",
+      "description": "Helps end users explore their matched photos using natural language queries after facial recognition has filtered their images",
+      "provider_id": "openai",
+      "model": "gpt-4.1",
+      "temperature": 0.4,
+      "top_p": 0.95,
+      "image_output_config": null,
+      "voice_config": null,
+      "file_output": false,
+      "response_schema_file": "response_schemas/photo_discovery_agent_response.json"
+    },
+    "admin_insights_agent": {
+      "agent_id": "69a27fcf8e6d0e51fd5cd3fd",
+      "name": "Admin Insights Agent",
+      "description": "Analyzes platform-wide metrics and generates natural language summaries of revenue trends, user growth, album activity, and engagement patterns for the admin",
+      "provider_id": "openai",
+      "model": "gpt-4.1",
+      "temperature": 0.3,
+      "top_p": 1,
+      "image_output_config": null,
+      "voice_config": null,
+      "file_output": false,
+      "response_schema_file": "response_schemas/admin_insights_agent_response.json"
+    }
+  }
+}

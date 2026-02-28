@@ -1,0 +1,20 @@
+{
+  "agent_name": "Photo Discovery Agent",
+  "agent_id": "69a27fcf00b22915dd81e164",
+  "description": "Helps end users explore their matched photos using natural language queries (e.g., \"show group photos\", \"photos near the stage\") after facial recognition has filtered their images",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "response": "string",
+    "action_items": [
+      "string"
+    ]
+  },
+  "example_response": {
+    "response": "The agent's response text",
+    "action_items": [
+      "sample string"
+    ]
+  }
+}

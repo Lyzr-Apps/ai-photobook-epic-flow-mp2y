@@ -1,0 +1,20 @@
+{
+  "agent_name": "Admin Insights Agent",
+  "agent_id": "69a27fcf8e6d0e51fd5cd3fd",
+  "description": "Analyzes platform-wide metrics and generates natural language summaries of revenue trends, user growth, album activity, and engagement patterns for the admin",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "response": "string",
+    "action_items": [
+      "string"
+    ]
+  },
+  "example_response": {
+    "response": "The agent's response text",
+    "action_items": [
+      "sample string"
+    ]
+  }
+}
