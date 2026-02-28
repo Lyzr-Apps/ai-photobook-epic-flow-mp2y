@@ -13,21 +13,15 @@ import {
   FiSearch, FiBarChart2, FiTrendingUp, FiMessageSquare
 } from 'react-icons/fi'
 import AgentChatPanel from './AgentChatPanel'
+import type { AlbumData } from '../page'
 
 const ADMIN_INSIGHTS_ID = '69a27fcf8e6d0e51fd5cd3fd'
 
 interface AdminDashboardProps {
-  showSample: boolean
+  albums: AlbumData[]
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
 }
-
-const MOCK_KPI = [
-  { label: 'Total Users', value: '1,247', icon: <FiUsers className="w-5 h-5" />, change: '+86 this month' },
-  { label: 'Active Subscriptions', value: '892', icon: <FiCreditCard className="w-5 h-5" />, change: '71.5% conversion' },
-  { label: 'Monthly Revenue', value: '$47,320', icon: <FiDollarSign className="w-5 h-5" />, change: '+12.3% MoM' },
-  { label: 'Total Albums', value: '3,241', icon: <FiImage className="w-5 h-5" />, change: '+214 this month' },
-]
 
 const MOCK_USERS = [
   { name: 'Sarah Mitchell', email: 'sarah@studio.co', tier: 'Professional', albums: 47, status: 'Active' },
@@ -35,14 +29,6 @@ const MOCK_USERS = [
   { name: 'Emily Parker', email: 'emily@photos.com', tier: 'Starter', albums: 8, status: 'Active' },
   { name: 'David Kim', email: 'david@lens.co', tier: 'Professional', albums: 31, status: 'Inactive' },
   { name: 'Lisa Rodriguez', email: 'lisa@snap.io', tier: 'Enterprise', albums: 89, status: 'Active' },
-]
-
-const MOCK_ALBUMS_ADMIN = [
-  { title: 'Anderson Wedding', owner: 'Sarah Mitchell', photos: 342, views: 2847, status: 'Active' },
-  { title: 'Tech Summit 2026', owner: 'James Chen', photos: 518, views: 5210, status: 'Active' },
-  { title: 'Spring Fashion', owner: 'Emily Parker', photos: 96, views: 432, status: 'Draft' },
-  { title: 'Corporate Retreat', owner: 'David Kim', photos: 187, views: 1205, status: 'Expired' },
-  { title: 'Gala Dinner', owner: 'Lisa Rodriguez', photos: 254, views: 3890, status: 'Active' },
 ]
 
 const MOCK_PAYMENTS = [
@@ -75,23 +61,38 @@ function renderMarkdown(text: string) {
   )
 }
 
-export default function AdminDashboard({ showSample, activeAgentId, setActiveAgentId }: AdminDashboardProps) {
+export default function AdminDashboard({ albums, activeAgentId, setActiveAgentId }: AdminDashboardProps) {
   const [search, setSearch] = useState('')
   const [chatOpen, setChatOpen] = useState(false)
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [insights, setInsights] = useState<{ response: string; actionItems: string[] } | null>(null)
 
-  const kpis = showSample ? MOCK_KPI : MOCK_KPI.map(k => ({ ...k, value: '--', change: '' }))
-  const users = showSample ? MOCK_USERS : []
-  const albums = showSample ? MOCK_ALBUMS_ADMIN : []
-  const payments = showSample ? MOCK_PAYMENTS : []
+  const totalPhotos = albums.reduce((sum, a) => sum + a.photos.length, 0)
+  const totalViews = albums.reduce((sum, a) => sum + a.views, 0)
+  const activeAlbums = albums.filter(a => a.status === 'Active').length
+
+  const kpis = [
+    { label: 'Total Users', value: '1,247', icon: <FiUsers className="w-5 h-5" />, change: '+86 this month' },
+    { label: 'Active Subscriptions', value: '892', icon: <FiCreditCard className="w-5 h-5" />, change: '71.5% conversion' },
+    { label: 'Monthly Revenue', value: '$47,320', icon: <FiDollarSign className="w-5 h-5" />, change: '+12.3% MoM' },
+    { label: 'Total Albums', value: albums.length.toLocaleString(), icon: <FiImage className="w-5 h-5" />, change: `${activeAlbums} active | ${totalPhotos} photos` },
+  ]
+
+  // Use real album data in the Albums tab
+  const albumRows = albums.map(a => ({
+    title: a.title,
+    owner: 'Jane Doe',
+    photos: a.photos.length,
+    views: a.views,
+    status: a.status,
+  }))
 
   const handleGenerateInsights = async () => {
     setInsightsLoading(true)
     setActiveAgentId(ADMIN_INSIGHTS_ID)
     try {
       const result = await callAIAgent(
-        'Generate a comprehensive platform analytics summary including user growth trends, revenue analysis, album activity, and engagement patterns.',
+        `Generate a comprehensive platform analytics summary. Current data: ${albums.length} total albums, ${totalPhotos} total photos, ${totalViews} total views, ${activeAlbums} active albums. Include user growth trends, revenue analysis, album activity, and engagement patterns.`,
         ADMIN_INSIGHTS_ID
       )
       if (result.success) {
@@ -224,7 +225,7 @@ export default function AdminDashboard({ showSample, activeAgentId, setActiveAge
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.filter(u => u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())).map((user, i) => (
+                    {MOCK_USERS.filter(u => u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())).map((user, i) => (
                       <TableRow key={i}>
                         <TableCell className="text-sm font-light tracking-wider">{user.name}</TableCell>
                         <TableCell className="text-sm font-light text-muted-foreground">{user.email}</TableCell>
@@ -235,9 +236,6 @@ export default function AdminDashboard({ showSample, activeAgentId, setActiveAge
                         </TableCell>
                       </TableRow>
                     ))}
-                    {users.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground font-light tracking-wider">No data available</TableCell></TableRow>
-                    )}
                   </TableBody>
                 </Table>
               </Card>
@@ -257,19 +255,19 @@ export default function AdminDashboard({ showSample, activeAgentId, setActiveAge
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {albums.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).map((album, i) => (
+                    {albumRows.filter(a => a.title.toLowerCase().includes(search.toLowerCase())).map((album, i) => (
                       <TableRow key={i}>
                         <TableCell className="text-sm font-light tracking-wider">{album.title}</TableCell>
                         <TableCell className="text-sm font-light text-muted-foreground">{album.owner}</TableCell>
                         <TableCell className="text-sm font-light">{album.photos}</TableCell>
-                        <TableCell className="text-sm font-light">{album.views?.toLocaleString()}</TableCell>
+                        <TableCell className="text-sm font-light">{album.views.toLocaleString()}</TableCell>
                         <TableCell>
                           <Badge variant={album.status === 'Active' ? 'default' : album.status === 'Draft' ? 'secondary' : 'outline'} className="rounded-none text-[9px] tracking-widest uppercase">{album.status}</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
-                    {albums.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground font-light tracking-wider">No data available</TableCell></TableRow>
+                    {albumRows.length === 0 && (
+                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground font-light tracking-wider">No albums yet</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -290,7 +288,7 @@ export default function AdminDashboard({ showSample, activeAgentId, setActiveAge
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {payments.filter(p => p.user.toLowerCase().includes(search.toLowerCase())).map((payment, i) => (
+                    {MOCK_PAYMENTS.filter(p => p.user.toLowerCase().includes(search.toLowerCase())).map((payment, i) => (
                       <TableRow key={i}>
                         <TableCell className="text-sm font-light tracking-wider">{payment.user}</TableCell>
                         <TableCell><Badge variant="secondary" className="rounded-none text-[9px] tracking-widest uppercase">{payment.plan}</Badge></TableCell>
@@ -301,9 +299,6 @@ export default function AdminDashboard({ showSample, activeAgentId, setActiveAge
                         </TableCell>
                       </TableRow>
                     ))}
-                    {payments.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground font-light tracking-wider">No data available</TableCell></TableRow>
-                    )}
                   </TableBody>
                 </Table>
               </Card>

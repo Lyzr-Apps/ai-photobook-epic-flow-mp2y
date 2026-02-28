@@ -1,47 +1,55 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import React, { useState, useRef } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   FiImage, FiCamera, FiEye, FiDollarSign,
-  FiSearch, FiPlus, FiMessageSquare, FiEdit, FiTrash2
+  FiSearch, FiPlus, FiMessageSquare, FiEdit, FiTrash2,
+  FiX, FiCalendar, FiCheck
 } from 'react-icons/fi'
 import AgentChatPanel from './AgentChatPanel'
+import type { AlbumData } from '../page'
 
 const ALBUM_INTELLIGENCE_ID = '69a27fcf8e6d0e51fd5cd3fb'
 
 interface CustomerDashboardProps {
-  onOpenAlbum: () => void
-  showSample: boolean
+  albums: AlbumData[]
+  onOpenAlbum: (albumId: number) => void
+  onCreateAlbum: (title: string, date: string, description: string) => void
+  onDeleteAlbum: (albumId: number) => void
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
 }
 
-const MOCK_STATS = [
-  { label: 'Total Albums', value: '24', icon: <FiImage className="w-5 h-5" />, sub: '+3 this month' },
-  { label: 'Total Photos', value: '3,847', icon: <FiCamera className="w-5 h-5" />, sub: '+412 this week' },
-  { label: 'Total Views', value: '12.5K', icon: <FiEye className="w-5 h-5" />, sub: '+18% vs last month' },
-  { label: 'Earnings', value: '$2,340', icon: <FiDollarSign className="w-5 h-5" />, sub: '+$340 pending' },
-]
-
-const MOCK_ALBUMS = [
-  { id: 1, title: 'Anderson Wedding', date: 'Feb 14, 2026', photos: 342, status: 'Active', color: 'from-amber-100 to-amber-50' },
-  { id: 2, title: 'Corporate Gala 2026', date: 'Jan 28, 2026', photos: 187, status: 'Active', color: 'from-slate-200 to-slate-100' },
-  { id: 3, title: 'Summer Collection', date: 'Jan 15, 2026', photos: 96, status: 'Draft', color: 'from-sky-100 to-sky-50' },
-  { id: 4, title: 'Lakeside Retreat', date: 'Dec 20, 2025', photos: 254, status: 'Active', color: 'from-emerald-100 to-emerald-50' },
-  { id: 5, title: 'Fashion Week Milano', date: 'Dec 5, 2025', photos: 518, status: 'Expired', color: 'from-rose-100 to-rose-50' },
-  { id: 6, title: 'Birthday Celebration', date: 'Nov 18, 2025', photos: 143, status: 'Active', color: 'from-violet-100 to-violet-50' },
-]
-
-export default function CustomerDashboard({ onOpenAlbum, showSample, activeAgentId, setActiveAgentId }: CustomerDashboardProps) {
+export default function CustomerDashboard({
+  albums, onOpenAlbum, onCreateAlbum, onDeleteAlbum, activeAgentId, setActiveAgentId
+}: CustomerDashboardProps) {
   const [search, setSearch] = useState('')
   const [chatOpen, setChatOpen] = useState(false)
-  const stats = showSample ? MOCK_STATS : MOCK_STATS.map(s => ({ ...s, value: '--', sub: '' }))
-  const albums = showSample ? MOCK_ALBUMS : []
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newDate, setNewDate] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+  const [successMsg, setSuccessMsg] = useState('')
+
+  const totalPhotos = albums.reduce((sum, a) => sum + a.photos.length, 0)
+  const totalViews = albums.reduce((sum, a) => sum + a.views, 0)
+  const totalEarnings = albums.filter(a => a.status === 'Active').length * 97.5
+
+  const stats = [
+    { label: 'Total Albums', value: albums.length.toString(), icon: <FiImage className="w-5 h-5" />, sub: `${albums.filter(a => a.status === 'Active').length} active` },
+    { label: 'Total Photos', value: totalPhotos.toLocaleString(), icon: <FiCamera className="w-5 h-5" />, sub: `Across ${albums.length} albums` },
+    { label: 'Total Views', value: totalViews >= 1000 ? `${(totalViews / 1000).toFixed(1)}K` : totalViews.toString(), icon: <FiEye className="w-5 h-5" />, sub: 'All time' },
+    { label: 'Earnings', value: `$${totalEarnings.toFixed(0)}`, icon: <FiDollarSign className="w-5 h-5" />, sub: 'Estimated' },
+  ]
+
   const filtered = albums.filter(a => a.title.toLowerCase().includes(search.toLowerCase()))
 
   const handleOpenChat = () => {
@@ -54,10 +62,43 @@ export default function CustomerDashboard({ onOpenAlbum, showSample, activeAgent
     setActiveAgentId(null)
   }
 
+  const handleCreateSubmit = () => {
+    if (!newTitle.trim()) return
+    const dateStr = newDate || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    onCreateAlbum(newTitle.trim(), dateStr, newDesc.trim())
+    setNewTitle('')
+    setNewDate('')
+    setNewDesc('')
+    setShowCreateModal(false)
+    setSuccessMsg(`Album "${newTitle.trim()}" created successfully`)
+    setTimeout(() => setSuccessMsg(''), 3000)
+  }
+
+  const handleDeleteConfirm = (albumId: number) => {
+    const album = albums.find(a => a.id === albumId)
+    onDeleteAlbum(albumId)
+    setDeleteConfirm(null)
+    if (album) {
+      setSuccessMsg(`Album "${album.title}" deleted`)
+      setTimeout(() => setSuccessMsg(''), 3000)
+    }
+  }
+
   return (
     <div className="flex h-full">
       <div className="flex-1 overflow-y-auto">
         <div className="p-8">
+          {/* Success Message */}
+          {successMsg && (
+            <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 flex items-center gap-2">
+              <FiCheck className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-light tracking-wider text-emerald-700">{successMsg}</span>
+              <button onClick={() => setSuccessMsg('')} className="ml-auto">
+                <FiX className="w-3.5 h-3.5 text-emerald-500" />
+              </button>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -67,7 +108,7 @@ export default function CustomerDashboard({ onOpenAlbum, showSample, activeAgent
               </p>
             </div>
             <Button
-              onClick={onOpenAlbum}
+              onClick={() => setShowCreateModal(true)}
               className="rounded-none bg-primary hover:bg-primary/90 tracking-widest text-xs uppercase px-6"
             >
               <FiPlus className="w-4 h-4 mr-2" />
@@ -115,10 +156,15 @@ export default function CustomerDashboard({ onOpenAlbum, showSample, activeAgent
                 <Card
                   key={album.id}
                   className="rounded-none border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
-                  onClick={onOpenAlbum}
+                  onClick={() => onOpenAlbum(album.id)}
                 >
-                  <div className={cn('h-40 bg-gradient-to-br flex items-center justify-center', album.color)}>
+                  <div className={cn('h-40 bg-gradient-to-br flex items-center justify-center relative', album.color)}>
                     <FiCamera className="w-8 h-8 text-muted-foreground/30" />
+                    {album.photos.length > 0 && (
+                      <span className="absolute bottom-2 right-2 text-[10px] tracking-wider bg-white/70 px-2 py-0.5">
+                        {album.photos.length} photos
+                      </span>
+                    )}
                   </div>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-2">
@@ -132,12 +178,27 @@ export default function CustomerDashboard({ onOpenAlbum, showSample, activeAgent
                     </div>
                     <div className="flex items-center justify-between text-muted-foreground">
                       <span className="text-xs font-light tracking-wider">{album.date}</span>
-                      <span className="text-xs font-light">{album.photos} photos</span>
+                      <span className="text-xs font-light">{album.views} views</span>
                     </div>
                     <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1.5 hover:bg-muted transition-colors"><FiEdit className="w-3.5 h-3.5" /></button>
-                      <button className="p-1.5 hover:bg-muted transition-colors"><FiEye className="w-3.5 h-3.5" /></button>
-                      <button className="p-1.5 hover:bg-muted transition-colors text-destructive"><FiTrash2 className="w-3.5 h-3.5" /></button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onOpenAlbum(album.id) }}
+                        className="p-1.5 hover:bg-muted transition-colors"
+                      >
+                        <FiEdit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onOpenAlbum(album.id) }}
+                        className="p-1.5 hover:bg-muted transition-colors"
+                      >
+                        <FiEye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm(album.id) }}
+                        className="p-1.5 hover:bg-muted transition-colors text-destructive"
+                      >
+                        <FiTrash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </CardContent>
                 </Card>
@@ -147,13 +208,16 @@ export default function CustomerDashboard({ onOpenAlbum, showSample, activeAgent
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <FiImage className="w-12 h-12 text-muted-foreground/30 mb-4" />
               <p className="font-serif text-lg tracking-wider font-light text-muted-foreground">
-                {showSample ? 'No albums match your search' : 'No albums yet'}
+                {search ? 'No albums match your search' : 'No albums yet'}
               </p>
               <p className="text-sm text-muted-foreground font-light tracking-wider mt-1">
-                {showSample ? 'Try a different search term' : 'Create your first album to get started'}
+                {search ? 'Try a different search term' : 'Create your first album to get started'}
               </p>
-              {!showSample && (
-                <Button onClick={onOpenAlbum} className="mt-4 rounded-none bg-primary tracking-widest text-xs uppercase">
+              {!search && (
+                <Button
+                  onClick={() => setShowCreateModal(true)}
+                  className="mt-4 rounded-none bg-primary tracking-widest text-xs uppercase"
+                >
                   <FiPlus className="w-4 h-4 mr-2" /> Create Album
                 </Button>
               )}
@@ -162,11 +226,97 @@ export default function CustomerDashboard({ onOpenAlbum, showSample, activeAgent
         </div>
       </div>
 
+      {/* Create Album Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowCreateModal(false)}>
+          <div className="bg-card border border-border w-full max-w-lg p-0" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="font-serif text-lg tracking-widest font-light">Create New Album</h3>
+              <button onClick={() => setShowCreateModal(false)} className="p-1 hover:bg-muted transition-colors">
+                <FiX className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <div>
+                <Label className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
+                  Album Title <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="e.g., Summer Wedding 2026"
+                  className="rounded-none mt-1.5 text-sm font-light tracking-wider"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground">Event Date</Label>
+                <Input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="rounded-none mt-1.5 text-sm font-light tracking-wider"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground">Description</Label>
+                <Textarea
+                  value={newDesc}
+                  onChange={(e) => setNewDesc(e.target.value)}
+                  placeholder="Describe the event or album..."
+                  rows={3}
+                  className="rounded-none mt-1.5 text-sm font-light tracking-wider resize-none"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateModal(false)}
+                className="rounded-none tracking-widest text-xs uppercase"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateSubmit}
+                disabled={!newTitle.trim()}
+                className="rounded-none bg-primary hover:bg-primary/90 tracking-widest text-xs uppercase px-6"
+              >
+                <FiPlus className="w-3.5 h-3.5 mr-2" /> Create Album
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm !== null && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-card border border-border w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-lg tracking-widest font-light mb-2">Delete Album</h3>
+            <p className="text-sm font-light text-muted-foreground tracking-wider mb-6">
+              Are you sure you want to delete &quot;{albums.find(a => a.id === deleteConfirm)?.title}&quot;? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)} className="rounded-none tracking-widest text-xs uppercase">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleDeleteConfirm(deleteConfirm)}
+                className="rounded-none bg-destructive hover:bg-destructive/90 text-destructive-foreground tracking-widest text-xs uppercase"
+              >
+                <FiTrash2 className="w-3.5 h-3.5 mr-2" /> Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI Chat Toggle */}
       {!chatOpen && (
         <button
           onClick={handleOpenChat}
-          className="fixed bottom-8 right-8 w-12 h-12 bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors z-10"
+          className="fixed bottom-20 right-8 w-12 h-12 bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors z-10"
         >
           <FiMessageSquare className="w-5 h-5" />
         </button>

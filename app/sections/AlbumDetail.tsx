@@ -1,53 +1,57 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import {
   FiUpload, FiCamera, FiArrowLeft, FiShare2, FiTrash2,
-  FiDownload, FiMessageSquare, FiLink
+  FiDownload, FiMessageSquare, FiLink, FiCheck, FiX, FiFile,
+  FiCopy
 } from 'react-icons/fi'
 import AgentChatPanel from './AgentChatPanel'
+import type { AlbumData, PhotoData } from '../page'
 
 const ALBUM_INTELLIGENCE_ID = '69a27fcf8e6d0e51fd5cd3fb'
 
+const PHOTO_COLORS = [
+  'from-amber-200 to-amber-100',
+  'from-rose-200 to-rose-100',
+  'from-sky-200 to-sky-100',
+  'from-emerald-200 to-emerald-100',
+  'from-violet-200 to-violet-100',
+  'from-slate-200 to-slate-100',
+]
+
 interface AlbumDetailProps {
+  album: AlbumData | null
   onBack: () => void
-  showSample: boolean
+  onUpdateAlbum: (album: AlbumData) => void
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
 }
 
-const MOCK_PHOTOS = Array.from({ length: 12 }, (_, i) => ({
-  id: i + 1,
-  name: `IMG_${(4200 + i).toString()}.jpg`,
-  selected: false,
-  color: [
-    'from-amber-200 to-amber-100',
-    'from-rose-200 to-rose-100',
-    'from-sky-200 to-sky-100',
-    'from-emerald-200 to-emerald-100',
-    'from-violet-200 to-violet-100',
-    'from-slate-200 to-slate-100',
-  ][i % 6],
-}))
-
-export default function AlbumDetail({ onBack, showSample, activeAgentId, setActiveAgentId }: AlbumDetailProps) {
+export default function AlbumDetail({ album, onBack, onUpdateAlbum, activeAgentId, setActiveAgentId }: AlbumDetailProps) {
   const [chatOpen, setChatOpen] = useState(false)
   const [selectedPhotos, setSelectedPhotos] = useState<Set<number>>(new Set())
-  const [albumTitle, setAlbumTitle] = useState(showSample ? 'Anderson Wedding' : '')
-  const [albumDesc, setAlbumDesc] = useState(showSample ? 'A beautiful celebration of love at the Anderson estate. Golden hour portraits, candid moments, and elegant ceremony coverage.' : '')
-  const [shareEnabled, setShareEnabled] = useState(true)
+  const [albumTitle, setAlbumTitle] = useState(album?.title || '')
+  const [albumDesc, setAlbumDesc] = useState(album?.description || '')
+  const [shareEnabled, setShareEnabled] = useState(album?.shareEnabled || false)
   const [dragOver, setDragOver] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [showQRModal, setShowQRModal] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [nextPhotoId, setNextPhotoId] = useState(album ? Math.max(0, ...album.photos.map(p => p.id)) + 1 : 1)
 
-  const photos = showSample ? MOCK_PHOTOS : []
+  const photos = album?.photos || []
 
   const togglePhoto = (id: number) => {
     setSelectedPhotos(prev => {
@@ -71,10 +75,141 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
     setActiveAgentId(ALBUM_INTELLIGENCE_ID)
   }
 
+  // Process files from either drag-and-drop or file input
+  const processFiles = useCallback((files: FileList | File[]) => {
+    if (!album || files.length === 0) return
+
+    setUploading(true)
+    setUploadProgress(0)
+
+    const fileArray = Array.from(files)
+    const imageFiles = fileArray.filter(f =>
+      f.type.startsWith('image/') || f.name.match(/\.(jpg|jpeg|png|gif|webp|heic|tiff|bmp)$/i)
+    )
+
+    if (imageFiles.length === 0) {
+      setSuccessMsg('No image files detected. Please upload image files.')
+      setTimeout(() => setSuccessMsg(''), 3000)
+      setUploading(false)
+      return
+    }
+
+    // Simulate upload progress
+    let progress = 0
+    const interval = setInterval(() => {
+      progress += Math.random() * 30
+      if (progress >= 100) {
+        progress = 100
+        clearInterval(interval)
+
+        // Create photo entries for uploaded files
+        const newPhotos: PhotoData[] = imageFiles.map((file, index) => ({
+          id: nextPhotoId + index,
+          name: file.name,
+          color: PHOTO_COLORS[(nextPhotoId + index) % PHOTO_COLORS.length],
+          size: `${(file.size / 1024).toFixed(0)} KB`,
+          uploadedAt: new Date().toISOString(),
+        }))
+
+        setNextPhotoId(prev => prev + imageFiles.length)
+
+        // Update the album with new photos
+        const updatedAlbum: AlbumData = {
+          ...album,
+          title: albumTitle || album.title,
+          description: albumDesc || album.description,
+          shareEnabled,
+          photos: [...album.photos, ...newPhotos],
+        }
+        onUpdateAlbum(updatedAlbum)
+
+        setUploading(false)
+        setUploadProgress(100)
+        setSuccessMsg(`${imageFiles.length} photo${imageFiles.length > 1 ? 's' : ''} uploaded successfully`)
+        setTimeout(() => { setSuccessMsg(''); setUploadProgress(0) }, 3000)
+      }
+      setUploadProgress(Math.min(progress, 100))
+    }, 200)
+  }, [album, albumTitle, albumDesc, shareEnabled, nextPhotoId, onUpdateAlbum])
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files)
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(e.target.files)
+    }
+    // Reset input so the same file can be uploaded again
+    e.target.value = ''
+  }
+
+  const handleDeleteSelected = () => {
+    if (!album) return
+    const updatedAlbum: AlbumData = {
+      ...album,
+      photos: album.photos.filter(p => !selectedPhotos.has(p.id)),
+    }
+    onUpdateAlbum(updatedAlbum)
+    setSelectedPhotos(new Set())
+    setSuccessMsg(`${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} deleted`)
+    setTimeout(() => setSuccessMsg(''), 3000)
+  }
+
+  const handleSaveSettings = () => {
+    if (!album) return
+    const updatedAlbum: AlbumData = {
+      ...album,
+      title: albumTitle || album.title,
+      description: albumDesc,
+      shareEnabled,
+      status: shareEnabled ? 'Active' : 'Draft',
+    }
+    onUpdateAlbum(updatedAlbum)
+    setSuccessMsg('Album settings saved')
+    setTimeout(() => setSuccessMsg(''), 3000)
+  }
+
+  const handleCopyLink = () => {
+    const shareLink = `https://lumiere.app/album/${album?.id || 'new'}`
+    navigator.clipboard?.writeText(shareLink).catch(() => {})
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  if (!album) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <FiCamera className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="font-serif text-lg tracking-wider font-light text-muted-foreground mb-2">No album selected</p>
+          <Button onClick={onBack} className="rounded-none bg-primary tracking-widest text-xs uppercase">
+            <FiArrowLeft className="w-4 h-4 mr-2" /> Back to Albums
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full">
       <div className="flex-1 overflow-y-auto">
         <div className="p-8">
+          {/* Success Message */}
+          {successMsg && (
+            <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 flex items-center gap-2">
+              <FiCheck className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-light tracking-wider text-emerald-700">{successMsg}</span>
+              <button onClick={() => setSuccessMsg('')} className="ml-auto">
+                <FiX className="w-3.5 h-3.5 text-emerald-500" />
+              </button>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <button onClick={onBack} className="p-2 hover:bg-muted transition-colors">
@@ -82,10 +217,10 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
             </button>
             <div>
               <h2 className="font-serif text-2xl tracking-widest font-light">
-                {albumTitle || 'New Album'}
+                {album.title}
               </h2>
               <p className="text-sm text-muted-foreground font-light tracking-wider mt-0.5">
-                {showSample ? '342 photos | Created Feb 14, 2026' : 'Configure your album'}
+                {photos.length} photos | Created {album.date}
               </p>
             </div>
           </div>
@@ -97,19 +232,44 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
               <div
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => { e.preventDefault(); setDragOver(false) }}
+                onDrop={handleDrop}
                 className={cn(
-                  'border-2 border-dashed p-8 text-center transition-colors',
-                  dragOver ? 'border-primary bg-primary/5' : 'border-border'
+                  'border-2 border-dashed p-8 text-center transition-colors cursor-pointer',
+                  dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
                 )}
+                onClick={() => !uploading && fileInputRef.current?.click()}
               >
-                <FiUpload className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-sm font-light tracking-wider text-muted-foreground">
-                  Drag & drop photos here or
-                </p>
-                <Button className="mt-3 rounded-none bg-primary tracking-widest text-xs uppercase">
-                  Browse Files
-                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                {uploading ? (
+                  <div>
+                    <div className="w-full h-2 bg-muted mb-3 overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-sm font-light tracking-wider text-muted-foreground">
+                      Uploading... {Math.round(uploadProgress)}%
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <FiUpload className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
+                    <p className="text-sm font-light tracking-wider text-muted-foreground">
+                      Drag & drop photos here, or click to browse
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60 tracking-wider mt-1">
+                      Supports JPG, PNG, WEBP, HEIC
+                    </p>
+                  </>
+                )}
               </div>
 
               {/* Bulk Actions */}
@@ -122,7 +282,12 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
                   <Button variant="outline" size="sm" className="rounded-none text-xs tracking-wider">
                     <FiDownload className="w-3.5 h-3.5 mr-1.5" /> Download
                   </Button>
-                  <Button variant="outline" size="sm" className="rounded-none text-xs tracking-wider text-destructive">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-none text-xs tracking-wider text-destructive"
+                    onClick={handleDeleteSelected}
+                  >
                     <FiTrash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
                   </Button>
                 </div>
@@ -132,7 +297,9 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
               {photos.length > 0 ? (
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-[10px] tracking-[0.3em] text-muted-foreground uppercase">Photos</p>
+                    <p className="text-[10px] tracking-[0.3em] text-muted-foreground uppercase">
+                      Photos ({photos.length})
+                    </p>
                     <button onClick={selectAll} className="text-xs text-primary tracking-wider hover:underline">
                       {selectedPhotos.size === photos.length ? 'Deselect All' : 'Select All'}
                     </button>
@@ -142,7 +309,7 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
                       <div
                         key={photo.id}
                         className={cn(
-                          'relative aspect-square bg-gradient-to-br flex items-center justify-center cursor-pointer group transition-all',
+                          'relative aspect-square bg-gradient-to-br flex flex-col items-center justify-center cursor-pointer group transition-all',
                           photo.color,
                           selectedPhotos.has(photo.id) && 'ring-2 ring-primary ring-offset-1'
                         )}
@@ -157,9 +324,14 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
                             <div className="w-3 h-3 bg-primary" />
                           )}
                         </div>
-                        <p className="absolute bottom-1 right-1.5 text-[8px] text-muted-foreground/50 tracking-wider">
+                        <p className="absolute bottom-1 left-1.5 right-1.5 text-[8px] text-muted-foreground/50 tracking-wider truncate">
                           {photo.name}
                         </p>
+                        {photo.size && (
+                          <span className="absolute top-1.5 right-1.5 text-[7px] text-muted-foreground/40 tracking-wider">
+                            {photo.size}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -171,18 +343,24 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
                     No photos uploaded yet
                   </p>
                   <p className="text-xs text-muted-foreground font-light tracking-wider mt-1">
-                    Upload photos to get started
+                    Drag & drop photos above or click to browse files
                   </p>
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-4 rounded-none bg-primary tracking-widest text-xs uppercase"
+                  >
+                    <FiUpload className="w-4 h-4 mr-2" /> Upload Photos
+                  </Button>
                 </div>
               )}
 
               {/* Mini Analytics */}
-              {showSample && (
+              {photos.length > 0 && (
                 <div className="grid grid-cols-3 gap-4">
                   {[
-                    { label: 'Views', value: '2,847', change: '+12%' },
-                    { label: 'Downloads', value: '186', change: '+8%' },
-                    { label: 'Shares', value: '43', change: '+24%' },
+                    { label: 'Views', value: album.views.toLocaleString(), change: '+12%' },
+                    { label: 'Downloads', value: album.downloads.toLocaleString(), change: '+8%' },
+                    { label: 'Shares', value: album.shares.toLocaleString(), change: '+24%' },
                   ].map((stat, i) => (
                     <Card key={i} className="rounded-none border-border">
                       <CardContent className="p-4 text-center">
@@ -231,11 +409,30 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
                     <Switch checked={shareEnabled} onCheckedChange={setShareEnabled} />
                   </div>
                   <Separator />
-                  <Button variant="outline" className="w-full rounded-none text-xs tracking-widest uppercase">
+                  <Button
+                    onClick={handleSaveSettings}
+                    className="w-full rounded-none bg-primary hover:bg-primary/90 tracking-widest text-xs uppercase"
+                  >
+                    <FiCheck className="w-3.5 h-3.5 mr-2" /> Save Settings
+                  </Button>
+                  <Separator />
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-none text-xs tracking-widest uppercase"
+                    onClick={() => setShowQRModal(true)}
+                  >
                     <FiLink className="w-3.5 h-3.5 mr-2" /> Generate QR Code
                   </Button>
-                  <Button variant="outline" className="w-full rounded-none text-xs tracking-widest uppercase">
-                    <FiShare2 className="w-3.5 h-3.5 mr-2" /> Copy Share Link
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-none text-xs tracking-widest uppercase"
+                    onClick={handleCopyLink}
+                  >
+                    {linkCopied ? (
+                      <><FiCheck className="w-3.5 h-3.5 mr-2" /> Link Copied</>
+                    ) : (
+                      <><FiCopy className="w-3.5 h-3.5 mr-2" /> Copy Share Link</>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
@@ -251,6 +448,28 @@ export default function AlbumDetail({ onBack, showSample, activeAgentId, setActi
           </div>
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      {showQRModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowQRModal(false)}>
+          <div className="bg-card border border-border w-full max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-lg tracking-widest font-light mb-4">QR Code</h3>
+            <div className="w-48 h-48 mx-auto bg-muted flex items-center justify-center mb-4 border border-border">
+              <div className="grid grid-cols-5 gap-1 p-4">
+                {Array.from({ length: 25 }).map((_, i) => (
+                  <div key={i} className={cn('w-4 h-4', Math.random() > 0.4 ? 'bg-foreground' : 'bg-transparent')} />
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground tracking-wider mb-4">
+              Share this QR code with event participants
+            </p>
+            <Button onClick={() => setShowQRModal(false)} className="rounded-none bg-primary tracking-widest text-xs uppercase">
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Chat Panel */}
       {chatOpen && (

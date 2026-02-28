@@ -1,20 +1,19 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   FiUpload, FiCamera, FiDownload, FiShare2,
-  FiMessageSquare, FiRefreshCw, FiSearch
+  FiMessageSquare, FiRefreshCw, FiSearch, FiCheck, FiX
 } from 'react-icons/fi'
 import AgentChatPanel from './AgentChatPanel'
 
 const PHOTO_DISCOVERY_ID = '69a27fcf00b22915dd81e164'
 
 interface EndUserGalleryProps {
-  showSample: boolean
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
 }
@@ -30,13 +29,16 @@ const MOCK_MATCHED_PHOTOS = [
   { id: 8, name: 'Table candid', confidence: 78, color: 'from-pink-200 to-pink-100' },
 ]
 
-export default function EndUserGallery({ showSample, activeAgentId, setActiveAgentId }: EndUserGalleryProps) {
+export default function EndUserGallery({ activeAgentId, setActiveAgentId }: EndUserGalleryProps) {
   const [chatOpen, setChatOpen] = useState(false)
   const [selectedPhotos, setSelectedPhotos] = useState<Set<number>>(new Set())
-  const [uploadState, setUploadState] = useState<'idle' | 'processing' | 'done'>(showSample ? 'done' : 'idle')
+  const [uploadState, setUploadState] = useState<'idle' | 'processing' | 'done'>('idle')
   const [dragOver, setDragOver] = useState(false)
+  const [uploadedFileName, setUploadedFileName] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const photos = showSample ? MOCK_MATCHED_PHOTOS : []
+  const photos = uploadState === 'done' ? MOCK_MATCHED_PHOTOS : []
 
   const togglePhoto = (id: number) => {
     setSelectedPhotos(prev => {
@@ -55,14 +57,46 @@ export default function EndUserGallery({ showSample, activeAgentId, setActiveAge
     }
   }
 
-  const simulateUpload = () => {
+  const startScanFlow = (fileName?: string) => {
     setUploadState('processing')
-    setTimeout(() => setUploadState('done'), 2500)
+    if (fileName) setUploadedFileName(fileName)
+    setTimeout(() => {
+      setUploadState('done')
+      setSuccessMsg(`${MOCK_MATCHED_PHOTOS.length} photos found matching your face`)
+      setTimeout(() => setSuccessMsg(''), 4000)
+    }, 2500)
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      startScanFlow(e.target.files[0].name)
+    }
+    e.target.value = ''
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0]
+      if (file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|gif|webp|heic)$/i)) {
+        startScanFlow(file.name)
+      } else {
+        setSuccessMsg('Please upload an image file (JPG, PNG, etc.)')
+        setTimeout(() => setSuccessMsg(''), 3000)
+      }
+    }
   }
 
   const handleOpenChat = () => {
     setChatOpen(true)
     setActiveAgentId(PHOTO_DISCOVERY_ID)
+  }
+
+  const handleReset = () => {
+    setUploadState('idle')
+    setSelectedPhotos(new Set())
+    setUploadedFileName('')
   }
 
   return (
@@ -73,9 +107,22 @@ export default function EndUserGallery({ showSample, activeAgentId, setActiveAge
           <div className="text-center mb-10">
             <h2 className="font-serif text-3xl tracking-[0.3em] font-light">Your Photos</h2>
             <p className="text-sm text-muted-foreground font-light tracking-wider mt-2">
-              Upload a selfie to find your photos from the event
+              {uploadState === 'done'
+                ? `Showing results for "${uploadedFileName || 'your selfie'}"`
+                : 'Upload a selfie to find your photos from the event'}
             </p>
           </div>
+
+          {/* Success/Info Message */}
+          {successMsg && (
+            <div className="mb-6 px-4 py-3 bg-emerald-50 border border-emerald-200 flex items-center gap-2 max-w-lg mx-auto">
+              <FiCheck className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-light tracking-wider text-emerald-700">{successMsg}</span>
+              <button onClick={() => setSuccessMsg('')} className="ml-auto">
+                <FiX className="w-3.5 h-3.5 text-emerald-500" />
+              </button>
+            </div>
+          )}
 
           {/* Upload Zone */}
           {uploadState === 'idle' && (
@@ -83,24 +130,39 @@ export default function EndUserGallery({ showSample, activeAgentId, setActiveAge
               <div
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => { e.preventDefault(); setDragOver(false); simulateUpload() }}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
                 className={cn(
-                  'border-2 border-dashed p-12 text-center transition-colors',
-                  dragOver ? 'border-primary bg-primary/5' : 'border-border'
+                  'border-2 border-dashed p-12 text-center transition-colors cursor-pointer',
+                  dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
                 )}
               >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
                 <FiUpload className="w-10 h-10 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="font-serif text-lg tracking-wider font-light mb-2">
                   Upload Your Selfie
                 </p>
                 <p className="text-sm text-muted-foreground font-light tracking-wider mb-4">
-                  Drag & drop a photo of yourself, or use one of the options below
+                  Drag & drop a photo of yourself, or click to browse
                 </p>
                 <div className="flex items-center justify-center gap-3">
-                  <Button onClick={simulateUpload} className="rounded-none bg-primary tracking-widest text-xs uppercase">
+                  <Button
+                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
+                    className="rounded-none bg-primary tracking-widest text-xs uppercase"
+                  >
                     <FiUpload className="w-4 h-4 mr-2" /> Upload Photo
                   </Button>
-                  <Button onClick={simulateUpload} variant="outline" className="rounded-none tracking-widest text-xs uppercase">
+                  <Button
+                    onClick={(e) => { e.stopPropagation(); startScanFlow('Camera capture') }}
+                    variant="outline"
+                    className="rounded-none tracking-widest text-xs uppercase"
+                  >
                     <FiCamera className="w-4 h-4 mr-2" /> Use Camera
                   </Button>
                 </div>
@@ -118,7 +180,7 @@ export default function EndUserGallery({ showSample, activeAgentId, setActiveAge
               </div>
               <p className="font-serif text-lg tracking-wider font-light">Scanning Event Photos</p>
               <p className="text-sm text-muted-foreground font-light tracking-wider mt-2">
-                Finding your matches across 3,847 photos...
+                Analyzing "{uploadedFileName || 'your selfie'}" across event photos...
               </p>
             </div>
           )}
@@ -138,10 +200,18 @@ export default function EndUserGallery({ showSample, activeAgentId, setActiveAge
                         Matched by facial recognition
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <button onClick={selectAll} className="text-xs text-primary tracking-wider hover:underline">
                         {selectedPhotos.size === photos.length ? 'Deselect All' : 'Select All'}
                       </button>
+                      <Button
+                        onClick={handleReset}
+                        variant="outline"
+                        size="sm"
+                        className="rounded-none text-xs tracking-wider"
+                      >
+                        <FiRefreshCw className="w-3 h-3 mr-1.5" /> New Search
+                      </Button>
                     </div>
                   </div>
 
@@ -210,7 +280,7 @@ export default function EndUserGallery({ showSample, activeAgentId, setActiveAge
                     Try uploading a clearer selfie
                   </p>
                   <Button
-                    onClick={() => setUploadState('idle')}
+                    onClick={handleReset}
                     variant="outline"
                     className="mt-4 rounded-none tracking-widest text-xs uppercase"
                   >
@@ -227,7 +297,7 @@ export default function EndUserGallery({ showSample, activeAgentId, setActiveAge
       {!chatOpen && uploadState === 'done' && photos.length > 0 && (
         <button
           onClick={handleOpenChat}
-          className="fixed bottom-8 right-8 w-12 h-12 bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors z-10"
+          className="fixed bottom-20 right-8 w-12 h-12 bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors z-10"
         >
           <FiMessageSquare className="w-5 h-5" />
         </button>
