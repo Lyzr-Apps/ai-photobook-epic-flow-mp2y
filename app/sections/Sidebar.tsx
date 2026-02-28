@@ -7,7 +7,7 @@ import {
   FiGrid, FiImage, FiLayers, FiBell, FiUser, FiCamera
 } from 'react-icons/fi'
 
-type Screen = 'customer-dashboard' | 'album-detail' | 'end-user-gallery' | 'admin-dashboard'
+type Screen = 'customer-dashboard' | 'album-detail' | 'end-user-gallery' | 'admin-dashboard' | 'shared-album'
 type UserRole = 'admin' | 'customer' | 'enduser'
 
 interface SidebarProps {

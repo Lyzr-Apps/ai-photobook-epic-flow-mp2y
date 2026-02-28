@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { FiCpu } from 'react-icons/fi'
 
@@ -101,7 +101,7 @@ const INITIAL_ALBUMS: AlbumData[] = [
   { id: 6, title: 'Birthday Celebration', date: 'Nov 18, 2025', description: 'Private birthday party celebration.', photos: Array.from({ length: 5 }, (_, i) => ({ id: i + 1, name: `BDAY_${200 + i}.jpg`, color: PHOTO_COLORS[i % 6] })), status: 'Active', color: GRADIENT_COLORS[5], shareEnabled: true, views: 340, downloads: 45, shares: 8 },
 ]
 
-type Screen = 'customer-dashboard' | 'album-detail' | 'end-user-gallery' | 'admin-dashboard'
+type Screen = 'customer-dashboard' | 'album-detail' | 'end-user-gallery' | 'admin-dashboard' | 'shared-album'
 type UserRole = 'admin' | 'customer' | 'enduser'
 
 // --- Main Page ---
@@ -111,7 +111,27 @@ export default function Page() {
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
   const [albums, setAlbums] = useState<AlbumData[]>(INITIAL_ALBUMS)
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null)
+  const [sharedAlbumId, setSharedAlbumId] = useState<number | null>(null)
   const [nextId, setNextId] = useState(7)
+
+  // Check URL for shared album link on mount and on popstate
+  useEffect(() => {
+    const checkForSharedAlbum = () => {
+      const params = new URLSearchParams(window.location.search)
+      const albumParam = params.get('album')
+      if (albumParam) {
+        const albumId = parseInt(albumParam, 10)
+        if (!isNaN(albumId)) {
+          setSharedAlbumId(albumId)
+          setCurrentScreen('shared-album')
+          setUserRole('enduser')
+        }
+      }
+    }
+    checkForSharedAlbum()
+    window.addEventListener('popstate', checkForSharedAlbum)
+    return () => window.removeEventListener('popstate', checkForSharedAlbum)
+  }, [])
 
   const handleOpenAlbum = useCallback((albumId: number) => {
     setSelectedAlbumId(albumId)
@@ -150,7 +170,33 @@ export default function Page() {
     }
   }, [selectedAlbumId])
 
+  // Navigate to shared album view (simulates end user clicking a share link)
+  const handleShareAlbum = useCallback((albumId: number) => {
+    setSharedAlbumId(albumId)
+    setCurrentScreen('shared-album')
+    setUserRole('enduser')
+    // Update URL so it is shareable
+    const url = new URL(window.location.href)
+    url.searchParams.set('album', albumId.toString())
+    window.history.pushState({}, '', url.toString())
+  }, [])
+
+  // Exit shared album view and go back to normal app
+  const handleExitSharedView = useCallback(() => {
+    setSharedAlbumId(null)
+    setCurrentScreen('customer-dashboard')
+    setUserRole('customer')
+    // Clean up URL
+    const url = new URL(window.location.href)
+    url.searchParams.delete('album')
+    window.history.pushState({}, '', url.toString())
+  }, [])
+
   const selectedAlbum = albums.find(a => a.id === selectedAlbumId) || null
+  const sharedAlbum = albums.find(a => a.id === sharedAlbumId) || null
+
+  // Check if we are in shared album mode (full-screen, no sidebar)
+  const isSharedView = currentScreen === 'shared-album'
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -171,6 +217,7 @@ export default function Page() {
             album={selectedAlbum}
             onBack={() => setCurrentScreen('customer-dashboard')}
             onUpdateAlbum={handleUpdateAlbum}
+            onShareAlbum={handleShareAlbum}
             activeAgentId={activeAgentId}
             setActiveAgentId={setActiveAgentId}
           />
@@ -178,6 +225,17 @@ export default function Page() {
       case 'end-user-gallery':
         return (
           <EndUserGallery
+            album={null}
+            onBack={null}
+            activeAgentId={activeAgentId}
+            setActiveAgentId={setActiveAgentId}
+          />
+        )
+      case 'shared-album':
+        return (
+          <EndUserGallery
+            album={sharedAlbum}
+            onBack={handleExitSharedView}
             activeAgentId={activeAgentId}
             setActiveAgentId={setActiveAgentId}
           />
@@ -193,6 +251,50 @@ export default function Page() {
       default:
         return null
     }
+  }
+
+  // Shared album view: full-screen layout without sidebar
+  if (isSharedView) {
+    return (
+      <ErrorBoundary>
+        <div className="min-h-screen bg-background text-foreground flex flex-col">
+          {/* Shared Album Header */}
+          <header className="h-14 border-b border-border bg-card flex items-center justify-between px-6 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <h1 className="font-serif text-lg tracking-[0.3em] font-light">LUMIERE</h1>
+              {sharedAlbum && (
+                <>
+                  <span className="text-muted-foreground/30">|</span>
+                  <span className="text-xs tracking-wider text-muted-foreground font-light">{sharedAlbum.title}</span>
+                </>
+              )}
+            </div>
+            <button
+              onClick={handleExitSharedView}
+              className="text-xs tracking-widest text-muted-foreground hover:text-foreground uppercase transition-colors"
+            >
+              Exit Preview
+            </button>
+          </header>
+
+          {/* Content */}
+          <main className="flex-1 overflow-hidden">
+            {renderScreen()}
+          </main>
+
+          {/* Agent Status Footer */}
+          <footer className="border-t border-border bg-card px-6 py-2.5 flex-shrink-0">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <FiCpu className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-[10px] tracking-[0.3em] text-muted-foreground uppercase">AI Powered</span>
+              </div>
+              <span className="text-[10px] tracking-wider text-muted-foreground">Facial recognition photo matching</span>
+            </div>
+          </footer>
+        </div>
+      </ErrorBoundary>
+    )
   }
 
   return (

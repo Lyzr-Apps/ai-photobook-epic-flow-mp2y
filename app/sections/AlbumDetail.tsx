@@ -32,11 +32,12 @@ interface AlbumDetailProps {
   album: AlbumData | null
   onBack: () => void
   onUpdateAlbum: (album: AlbumData) => void
+  onShareAlbum: (albumId: number) => void
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
 }
 
-export default function AlbumDetail({ album, onBack, onUpdateAlbum, activeAgentId, setActiveAgentId }: AlbumDetailProps) {
+export default function AlbumDetail({ album, onBack, onUpdateAlbum, onShareAlbum, activeAgentId, setActiveAgentId }: AlbumDetailProps) {
   const [chatOpen, setChatOpen] = useState(false)
   const [selectedPhotos, setSelectedPhotos] = useState<Set<number>>(new Set())
   const [albumTitle, setAlbumTitle] = useState(album?.title || '')
@@ -174,11 +175,21 @@ export default function AlbumDetail({ album, onBack, onUpdateAlbum, activeAgentI
     setTimeout(() => setSuccessMsg(''), 3000)
   }
 
+  const getShareLink = () => {
+    const base = typeof window !== 'undefined' ? window.location.origin : ''
+    return `${base}?album=${album?.id || 'new'}`
+  }
+
   const handleCopyLink = () => {
-    const shareLink = `https://lumiere.app/album/${album?.id || 'new'}`
+    const shareLink = getShareLink()
     navigator.clipboard?.writeText(shareLink).catch(() => {})
     setLinkCopied(true)
-    setTimeout(() => setLinkCopied(false), 2000)
+    setSuccessMsg('Share link copied to clipboard')
+    setTimeout(() => { setLinkCopied(false); setSuccessMsg('') }, 2500)
+  }
+
+  const handlePreviewAsGuest = () => {
+    if (album) onShareAlbum(album.id)
   }
 
   if (!album) {
@@ -419,13 +430,6 @@ export default function AlbumDetail({ album, onBack, onUpdateAlbum, activeAgentI
                   <Button
                     variant="outline"
                     className="w-full rounded-none text-xs tracking-widest uppercase"
-                    onClick={() => setShowQRModal(true)}
-                  >
-                    <FiLink className="w-3.5 h-3.5 mr-2" /> Generate QR Code
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-none text-xs tracking-widest uppercase"
                     onClick={handleCopyLink}
                   >
                     {linkCopied ? (
@@ -434,6 +438,23 @@ export default function AlbumDetail({ album, onBack, onUpdateAlbum, activeAgentI
                       <><FiCopy className="w-3.5 h-3.5 mr-2" /> Copy Share Link</>
                     )}
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-none text-xs tracking-widest uppercase"
+                    onClick={() => setShowQRModal(true)}
+                  >
+                    <FiLink className="w-3.5 h-3.5 mr-2" /> Generate QR Code
+                  </Button>
+                  <Separator />
+                  <Button
+                    onClick={handlePreviewAsGuest}
+                    className="w-full rounded-none bg-accent text-accent-foreground hover:bg-accent/90 tracking-widest text-xs uppercase"
+                  >
+                    <FiShare2 className="w-3.5 h-3.5 mr-2" /> Preview as Guest
+                  </Button>
+                  <p className="text-[9px] text-center text-muted-foreground tracking-wider">
+                    See what guests see when they open the shared link
+                  </p>
                 </CardContent>
               </Card>
 
@@ -461,12 +482,20 @@ export default function AlbumDetail({ album, onBack, onUpdateAlbum, activeAgentI
                 ))}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground tracking-wider mb-4">
+            <p className="text-xs text-muted-foreground tracking-wider mb-2">
               Share this QR code with event participants
             </p>
-            <Button onClick={() => setShowQRModal(false)} className="rounded-none bg-primary tracking-widest text-xs uppercase">
-              Close
-            </Button>
+            <div className="mb-4 p-2 bg-muted text-[9px] tracking-wider text-muted-foreground break-all">
+              {getShareLink()}
+            </div>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={handleCopyLink} variant="outline" className="rounded-none tracking-widest text-xs uppercase">
+                <FiCopy className="w-3 h-3 mr-1.5" /> Copy Link
+              </Button>
+              <Button onClick={() => setShowQRModal(false)} className="rounded-none bg-primary tracking-widest text-xs uppercase">
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       )}
